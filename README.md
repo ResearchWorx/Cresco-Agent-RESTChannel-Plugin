@@ -4,7 +4,7 @@ Cresco-Agent-RESTChannel-Plugin
 ### Status
 [![Build Status](http://128.163.188.129:9998/buildStatus/icon?job=Cresco-Agent-RESTChannel-Plugin)](http://128.163.188.129:9998/job/Cresco-Agent-RESTChannel-Plugin/)
 
----
+--- 
 ### Install
 
 1. Download/update/confirm avalability of the [Cresco-Agent](http://128.163.188.129:9998/job/Cresco-Agent/lastSuccessfulBuild/com.researchworx.cresco$cresco-agent/) 
