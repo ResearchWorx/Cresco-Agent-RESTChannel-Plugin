@@ -1,4 +1,4 @@
-Cresco-Agent-Controller-Plugin
+Cresco-Agent-RESTChannel-Plugin
 ==============================
 
 ### Status
