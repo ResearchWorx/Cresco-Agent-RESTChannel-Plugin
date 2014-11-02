@@ -31,6 +31,17 @@ public class PluginConfig {
 	{
 		return configObj.getString("region");
 	}
+	public boolean getLogConsumerEnabled()
+	{
+		if(configObj.getString("enablelogconsumer").equals("1"))
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 	public int getWatchDogTimer()
 	{
 		return configObj.getInt("watchdogtimer");

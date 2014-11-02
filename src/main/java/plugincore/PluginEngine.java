@@ -5,7 +5,8 @@ import httpserv.httpServerEngine;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.jar.Attributes;
 import java.util.jar.JarInputStream;
@@ -13,10 +14,9 @@ import java.util.jar.Manifest;
 
 import org.apache.commons.configuration.SubnodeConfiguration;
 
-import channels.RESTConsumer;
-import channels.RESTProducer;
+import channels.RPCCall;
+import shared.Clogger;
 import shared.MsgEvent;
-import shared.MsgEventType;
 import shared.PluginImplementation;
 
 
@@ -26,23 +26,32 @@ public class PluginEngine {
 	public static PluginConfig config;
 	
 	public static String pluginName;
-	public static String pluginSlot;
-	public static String agentName;
+	public static String pluginVersion;
+	public static String plugin;
+	public static String agent;
 	public static String region;
 	
-	public static HashMap<String,MsgEvent> replyRESTmap;
+	public static CommandExec commandExec;
+	
+	public static boolean RESTConsumerEnabled = false;
+	public static boolean RESTConsumerActive = false;
+	
+	public static RPCCall rpcc;
+	
+	/*
+	private static Thread RESTProducerThread;
+	public static boolean RESTProducerActive = false;
+	public static boolean RESTProducerEnabled = false;
+	*/
+	
+	public static Map<String,MsgEvent> rpcMap;
+	
+	public static ConcurrentLinkedQueue<MsgEvent> logOutQueue;
+	
+	
+	public static Clogger clog;
+
 	public static ConcurrentLinkedQueue<MsgEvent> msgInQueue;
-	public static RESTConsumer restConsumer;
-	public static boolean ConsumerActive = false;
-	public static boolean ConsumerEnabled = false;
-	
-	private static Thread ProducerThread;
-	public static ConcurrentLinkedQueue<MsgEvent> msgOutQueue;
-	public static boolean ProducerActive = false;
-	public static boolean ProducerEnabled = false;
-	
-	//public static boolean watchDogActive = false; //agent watchdog on/off
-	
 	
 	public PluginEngine()
 	{
@@ -73,80 +82,76 @@ public class PluginEngine {
 		   catch(Exception ex)
 		   {
 			   String msg = "Unable to determine Plugin Version " + ex.toString();
-			   System.err.println(msg);
-			   //logQueueOutgoing.offer(new LogEvent("ERROR",pluginSlot,msg));
-			   msgOutQueue.offer(new MsgEvent(MsgEventType.INFO,PluginEngine.region,PluginEngine.agentName,PluginEngine.pluginSlot,msg));
+			   clog.error(msg);
 			   version = "Unable to determine Version";
 		   }
 		   
 		   return pluginName + "." + version;
 	   }
 	//steps to init the plugin
-	public boolean initialize(ConcurrentLinkedQueue<MsgEvent> msgOutQueue,ConcurrentLinkedQueue<MsgEvent> msgInQueue, SubnodeConfiguration configObj, String region,String agentName, String plugin)  
+	public boolean initialize(ConcurrentLinkedQueue<MsgEvent> msgOutQueue,ConcurrentLinkedQueue<MsgEvent> msgInQueue, SubnodeConfiguration configObj, String region,String agent, String plugin)  
 	{
-		this.msgOutQueue = msgOutQueue;
-		this.msgInQueue = msgInQueue;
+		rpcMap = new ConcurrentHashMap<String,MsgEvent>();
+		rpcc = new RPCCall();
 		
-		this.agentName = agentName;
-		this.pluginSlot = pluginSlot;
+		commandExec = new CommandExec();
+		//this.msgOutQueue = msgOutQueue; //send directly to log queue
+		this.msgInQueue = msgInQueue; //messages to agent should go here
+		
+		this.agent = agent;
+		this.plugin = plugin;
+		
 		this.region = region;
 		try{
-			this.config = new PluginConfig(configObj);
-			
-			String startmsg = "Initializing Plugin: " + getVersion();
-			System.err.println(startmsg);
-			
+			//no need for this plugin to use the log queue input
+			/*
 			if(msgOutQueue == null)
 			{
 				System.out.println("MsgOutQueue==null");
+				return false;
 			}
+			*/
+			logOutQueue = new ConcurrentLinkedQueue<MsgEvent>(); //create our own queue
+			
 			if(msgInQueue == null)
 			{
 				System.out.println("MsgInQueue==null");
+				return false;
 			}
 			
-			//logQueueOutgoing.offer(new LogEvent("INFO",pluginID,startmsg));
-			msgOutQueue.offer(new MsgEvent(MsgEventType.INFO,PluginEngine.region,PluginEngine.agentName,PluginEngine.pluginSlot,startmsg));
+			this.config = new PluginConfig(configObj);
 			
-	    	System.out.println("Starting AMPQChannel Plugin");
-	    
+			//create logger
+			clog = new Clogger(msgInQueue,region,agent,plugin); //send logs directly to outqueue
+			
+			String startmsg = "Initializing Plugin: Region=" + region + " Agent=" + agent + " plugin=" + plugin + " version" + getVersion();
+			clog.log(startmsg);
+			
+			
+	    	System.out.println("Starting RESTChannel Plugin");
 	    	try
 	    	{
-	    		System.out.println("REST HTTP Service");
+	    		System.out.println("Starting HTTP Service");
 				httpServerEngine httpEngine = new httpServerEngine();
 				Thread httpServerThread = new Thread(httpEngine);
 		    	httpServerThread.start();		    
 	    	}
 	    	catch(Exception ex)
 	    	{
-	    		System.out.println("REST Plugin Init error: " + ex.toString());
-	    		return false;
-	    	}
-    		
-			//Create Incoming log Queue wait to start
-	    	restConsumer = new RESTConsumer();
-    		while(!ConsumerEnabled)
-	    	{
-	    		Thread.sleep(1000);
-	    		String msg = "Waiting for RESTConsumer Initialization...";
-	    		msgOutQueue.offer(new MsgEvent(MsgEventType.INFO,PluginEngine.region,PluginEngine.agentName,PluginEngine.pluginSlot,msg));
-				System.out.println(msg);
+	    		System.out.println("Unable to Start HTTP Service : " + ex.toString());
 	    	}
 	    	
-	    	
-	    	RESTProducer v = new RESTProducer();
+	    	/*
+	    	AMPQLogProducer v = new AMPQLogProducer();
 	    	ProducerThread = new Thread(v);
 	    	ProducerThread.start();
 	    	while(!ProducerEnabled)
 	    	{
 	    		Thread.sleep(1000);
-	    		String msg = "Waiting for AMPQProducer Initialization...";
-	    		msgOutQueue.offer(new MsgEvent(MsgEventType.INFO,PluginEngine.region,PluginEngine.agentName,PluginEngine.pluginSlot,msg));
-				System.out.println(msg);
+	    		String msg = "Waiting for AMPQProducer Initialization : Region=" + region + " Agent=" + agent + " plugin=" + plugin;
+	    		clog.log(msg);
 	    	}
-	    	
-	    	PluginEngine.ConsumerActive = true;
-	    	PluginEngine.ProducerActive = true;
+	    	*/
 	    	
 	    	
 	    	WatchDog wd = new WatchDog();
@@ -157,53 +162,46 @@ public class PluginEngine {
 		}
 		catch(Exception ex)
 		{
-			String msg = "ERROR IN PLUGIN: " + ex.toString();
-			System.err.println(msg);
-			//logQueue.offer(new LogEvent("ERROR",pluginID,msg));
-			msgOutQueue.offer(new MsgEvent(MsgEventType.INFO,PluginEngine.region,PluginEngine.agentName,PluginEngine.pluginSlot,msg));
-			
+			String msg = "ERROR IN PLUGIN: : Region=" + region + " Agent=" + agent + " plugin=" + plugin + " " + ex.toString();
+			clog.error(msg);
 			return false;
 		}
 		
 	}
 	
-	public MsgEvent msgIn(MsgEvent ce)
+	public void msgIn(MsgEvent me)
 	{
-		if(ce.getMsgType() == MsgEventType.DISCOVER)
+		
+		final MsgEvent ce = me;
+		try
 		{
-			StringBuilder sb = new StringBuilder();
-			sb.append("help\n");
-			sb.append("show\n");
-			sb.append("show_name\n");
-			sb.append("show_version\n");
-			ce.setMsgBody(sb.toString());
+		Thread thread = new Thread(){
+		    public void run(){
+		
+		    	try 
+		        {
+					MsgEvent re = commandExec.cmdExec(ce);
+					if(re != null)
+					{
+						re.setReturn(); //reverse to-from for return
+						msgInQueue.offer(re); //send message back to queue
+					}
+					
+				} 
+		        catch(Exception ex)
+		        {
+		        	System.out.println("Controller : PluginEngine : msgIn Thread: " + ex.toString());
+		        }
+		    }
+		  };
+		  thread.start();
 		}
-		else if(ce.getMsgType() == MsgEventType.EXEC) //Execute and respond to execute commands
+		catch(Exception ex)
 		{
-			if(ce.getParam("cmd").equals("show") || ce.getParam("cmd").equals("?") || ce.getParam("cmd").equals("help"))
-			{
-			StringBuilder sb = new StringBuilder();
-			sb.append("\nPlugin " + getName() + " Help\n");
-			sb.append("-\n");
-			sb.append("show\t\t\t\t\t Shows Commands\n");
-			sb.append("show name\t\t\t\t Shows Plugin Name\n");
-			sb.append("show version\t\t\t\t Shows Plugin Version");
-			ce.setMsgBody(sb.toString());
-			}
-			else if(ce.getParam("cmd").equals("show_version"))
-			{
-				ce.setMsgBody(getVersion());
-			}
-			else if(ce.getParam("cmd").equals("show_name"))
-			{
-				ce.setMsgBody(getName());
-			}
+			System.out.println("Controller : PluginEngine : msgIn Thread: " + ex.toString());        	
 		}
-		else
-		{
-			ce.setMsgBody("Plugin Command [" + ce.getMsgType().toString() + "] unknown");
-		}
-		return ce;
+		
 	}
+		
 		
 }

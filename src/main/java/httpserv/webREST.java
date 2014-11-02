@@ -17,12 +17,13 @@ import shared.MsgEventType;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
  
 @Path("/API")
 public class webREST {
 	
 	//http://192.168.1.116:9999/API?type=exec&region=test&agent=controller2&plugin=plugin/0&paramkey=cmd&paramvalue=show_version
-	
+	//http://192.168.1.116:32001/API?type=exec&region=test&agent=controller2&plugin=plugin/0&paramkey=cmd&paramvalue=show_version
 	//add plugin
 	//http://192.168.1.116:9999/API?type=config&region=test&agent=controller2&paramkey=configtype&paramvalue=pluginadd&paramkey=plugin&paramvalue=plugin/1
 	
@@ -64,6 +65,18 @@ public class webREST {
 		   	    	params.put(param, paramsvalue.get(paramskey.indexOf(param)));
 		   	    }
 	    		me = new MsgEvent(MsgEventType.valueOf(type.toUpperCase()),region,agent,plugin,params);
+	    		if((region != null) && (agent != null) && (plugin != null))
+	    		{
+	    			//plugin message
+	    			me.setSrc(PluginEngine.region, PluginEngine.agent, PluginEngine.plugin);
+	    			me.setDst(region, agent, plugin);
+	    		}
+	    		else if((region != null) && (agent != null) && (plugin == null))
+	    		{
+	    			me.setSrc(PluginEngine.region, PluginEngine.agent, PluginEngine.plugin);
+	    			me.setParam("dst_region", region);
+	    			me.setParam("dst_agent", agent);
+	    		}
 	    	}
 	    	catch(Exception ex)
 	    	{
@@ -71,38 +84,43 @@ public class webREST {
 	    		return Response.status(Response.Status.BAD_REQUEST).entity("bad request").build();
 	    	}
 	    	
-	    	
-	    	//me.setMsgType(MsgEventType.DISCOVER);
-	   		//me.setMsgBody("Request Discovery");
-	    	System.out.println(me.getParamsString());
-	    	System.out.println(me.getMsgType().toString());
-	    	
-	    	String restid = PluginEngine.restConsumer.call(me); //send discovery message
-	    	
-	    	if(restid == null)
+	    	System.out.println("REST PRE RPC");
+   		    System.out.println("MsgType=" + me.getMsgType().toString());
+			System.out.println("Region=" + me.getMsgRegion() + " Agent=" + me.getMsgAgent() + " plugin=" + me.getMsgPlugin());
+			System.out.println("params=" + me.getParamsString());
+   		   
+	    	try
+	    	{
+	    		
+	    		MsgEvent ce = PluginEngine.rpcc.call(me);
+	    		
+	    		
+	    		System.out.println("REST PRE RPC");
+	   		    System.out.println("MsgType=" + ce.getMsgType().toString());
+				System.out.println("Region=" + ce.getMsgRegion() + " Agent=" + ce.getMsgAgent() + " plugin=" + ce.getMsgPlugin());
+				System.out.println("params=" + ce.getParamsString());
+	   		   
+				
+	    		String returnString = null;
+				
+	    		if(ce != null)
+	    		{
+	    			Gson gson = new Gson();
+					returnString = gson.toJson(ce);
+	    		}
+	    		else
+	    		{
+	    			returnString = "ok";
+	    		}
+	    		return Response.ok(returnString, MediaType.TEXT_HTML_TYPE).build();
+			}
+	    	catch(Exception ex)
 	    	{
 	    		return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Internal Server Error").build();
+		    		
 	    	}
 	    	
-	    	MsgEvent ce = null;
-	    	int count = 0;
-	    	int timeout = 10*20; //(10=1sec) * (20 sec)
-	    	while((!PluginEngine.replyRESTmap.containsKey(restid)) && (count < timeout))
-	    	{
-	    		Thread.sleep(100);
-	    		count++;
-	    	}
 	    	
-	    	if(PluginEngine.replyRESTmap.containsKey(restid))
-	    	{
-	    		ce = PluginEngine.replyRESTmap.get(restid);
-	    	}
-	    	
-	    	Gson gson = new Gson();
-			String returnString = gson.toJson(ce);
-			
-			return Response.ok(returnString, MediaType.TEXT_HTML_TYPE).build();
-			
 	    }
 		catch(Exception ex)
 		{

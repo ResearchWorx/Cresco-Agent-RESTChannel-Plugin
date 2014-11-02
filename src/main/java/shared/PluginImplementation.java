@@ -24,14 +24,13 @@ public class PluginImplementation implements PluginInterface {
     {
     	return ((PluginEngine) pe).getVersion();
 	}	
-	public MsgEvent msgIn(MsgEvent command)
+	public void msgIn(MsgEvent command)
     {
-		return ((PluginEngine) pe).msgIn(command);
+		((PluginEngine) pe).msgIn(command);
 	}
-	
-	public boolean initialize(ConcurrentLinkedQueue<MsgEvent> msgOutQueue,ConcurrentLinkedQueue<MsgEvent> msgInQueue, SubnodeConfiguration configObj, String region,String agentName, String plugin) 
+	public boolean initialize(ConcurrentLinkedQueue<MsgEvent> msgOutQueue,ConcurrentLinkedQueue<MsgEvent> msgInQueue, SubnodeConfiguration configObj, String region, String agent, String plugin) 
 	{
-	   return ((PluginEngine) pe).initialize(msgOutQueue,msgInQueue, configObj,region,agentName,plugin);
+	   return ((PluginEngine) pe).initialize(msgOutQueue,msgInQueue,configObj,region,agent,plugin);
     }
 	public void shutdown()
 	{
