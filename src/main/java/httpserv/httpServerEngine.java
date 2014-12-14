@@ -44,9 +44,14 @@ package httpserv;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
+
 import javax.ws.rs.core.UriBuilder;
+
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.net.UnknownHostException;
@@ -128,10 +133,49 @@ public class httpServerEngine implements Runnable{
     	
 		}  
     	
-    	return UriBuilder.fromUri("http://" + ipAddress + "/").port(getPort(32001)).build();
+    	
+    	
+    	int httpPort = 32001;
+    	/*
+    	if(!isPortInUse(ipAddress,httpPort))
+    	{
+    		System.out.println("HttpPort=" + httpPort + " is used");
+    		httpPort++;
+    	}
+    	if(!isPortInUse(ipAddress,httpPort))
+    	{
+    		System.out.println("HttpPort=" + httpPort + " is used");
+    		httpPort++;
+    	}
+    	*/
+    	while(isPortInUse(ipAddress,httpPort))
+    	{
+    		httpPort++;
+    		//System.out.println("HttpPort=" + httpPort);
+        	
+    	}
+    	return UriBuilder.fromUri("http://" + ipAddress + "/").port(getPort(httpPort)).build();
         
     }
 
+        	private static boolean isPortInUse(String hostName, int portNumber) {
+            boolean result;
+
+            try {
+
+                Socket s = new Socket(hostName, portNumber);
+                s.close();
+                result = true;
+
+            }
+            catch(Exception e) {
+                result = false;
+            }
+
+            return(result);
+    
+    }
+    
     public static final URI BASE_URI = getBaseURI();
 
        

@@ -83,24 +83,26 @@ public class webREST {
 	    		System.out.println("getRoot : Problem building message:" + ex.toString());
 	    		return Response.status(Response.Status.BAD_REQUEST).entity("bad request").build();
 	    	}
-	    	
+	    	/*
 	    	System.out.println("REST PRE RPC");
    		    System.out.println("MsgType=" + me.getMsgType().toString());
 			System.out.println("Region=" + me.getMsgRegion() + " Agent=" + me.getMsgAgent() + " plugin=" + me.getMsgPlugin());
 			System.out.println("params=" + me.getParamsString());
-   		   
+   		    */
+	    	
 	    	try
 	    	{
 	    		
 	    		MsgEvent ce = PluginEngine.rpcc.call(me);
 	    		
-	    		
+	    		/*
 	    		System.out.println("REST PRE RPC");
 	   		    System.out.println("MsgType=" + ce.getMsgType().toString());
 				System.out.println("Region=" + ce.getMsgRegion() + " Agent=" + ce.getMsgAgent() + " plugin=" + ce.getMsgPlugin());
 				System.out.println("params=" + ce.getParamsString());
-	   		   
-				
+	   		    */
+				//whut
+	    		
 	    		String returnString = null;
 				
 	    		if(ce != null)
